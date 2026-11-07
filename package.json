@@ -1,0 +1,11 @@
+{
+  "name": "smart-study-planner",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build",
+    "dev": "cd frontend && npm run dev",
+    "start": "python backend/run_server.py"
+  }
+}
+

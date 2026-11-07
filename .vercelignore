@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Node / Frontend build artifacts (Vercel rebuilds from source)
+frontend/node_modules/
+node_modules/
+
+# Local data & uploads (Vercel uses /tmp)
+backend/data/
+backend/uploads/
+data/
+uploads/
+
+# Dev/test files
+backend/test_*.py
+backend/*.log
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
