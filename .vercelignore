@@ -6,13 +6,12 @@ __pycache__/
 .Python
 *.egg-info/
 .eggs/
-dist/
 build/
 .venv/
 venv/
 env/
 
-# Node / Frontend build artifacts (Vercel rebuilds from source)
+# Node
 frontend/node_modules/
 node_modules/
 

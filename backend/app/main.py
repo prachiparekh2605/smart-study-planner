@@ -1,7 +1,9 @@
 import os
-from fastapi import FastAPI
+from pathlib import Path
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.database import engine, Base
 from app.config import UPLOAD_DIR
@@ -44,7 +46,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all route modules
+# Include all API route modules
 app.include_router(auth_routes.router)
 app.include_router(subject_routes.router)
 app.include_router(material_routes.router)
@@ -57,8 +59,8 @@ app.include_router(analytics_routes.router)
 app.include_router(revision_routes.router)
 app.include_router(focus_routes.router)
 
-@app.get("/")
 @app.get("/api")
+@app.get("/api/")
 @app.get("/api/health")
 def health_check():
     return {
@@ -75,3 +77,42 @@ def health_check():
             "Agent 7: Revision Agent"
         ]
     }
+
+# ---------------------------------------------------------------------------
+# Frontend Static Asset & SPA Serving (Safety net for Vercel & self-hosting)
+# ---------------------------------------------------------------------------
+FRONTEND_DIST = None
+_candidates = [
+    Path(__file__).resolve().parent.parent.parent / "frontend" / "dist",
+    Path(__file__).resolve().parent.parent / "frontend" / "dist",
+    Path("frontend/dist"),
+    Path("/var/task/frontend/dist"),
+]
+for _c in _candidates:
+    if _c.exists() and (_c / "index.html").exists():
+        FRONTEND_DIST = _c
+        break
+
+if FRONTEND_DIST:
+    _assets_path = FRONTEND_DIST / "assets"
+    if _assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(_assets_path)), name="frontend_assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa_frontend(full_path: str):
+        # Never intercept API requests
+        if full_path.startswith("api/") or full_path == "api":
+            raise HTTPException(status_code=404, detail="API route not found")
+        target_file = FRONTEND_DIST / full_path
+        if target_file.is_file():
+            return FileResponse(str(target_file))
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
+else:
+    @app.get("/")
+    def root_fallback():
+        return {
+            "message": "StudyMind AI Backend is running.",
+            "status": "online",
+            "docs": "/docs",
+            "api_health": "/api/health"
+        }

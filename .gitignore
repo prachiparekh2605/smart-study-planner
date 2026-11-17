@@ -11,9 +11,6 @@ env/
 node_modules/
 frontend/node_modules/
 
-# Build outputs
-frontend/dist/
-
 # Local data
 backend/data/
 backend/uploads/
@@ -38,3 +35,4 @@ Thumbs.db
 # Logs
 *.log
 
+.vercel
