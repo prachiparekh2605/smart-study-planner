@@ -6,6 +6,7 @@ The backend is in `../backend/` and is added to sys.path at import time.
 """
 import sys
 import os
+import urllib.parse
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -33,9 +34,6 @@ from app.main import app as _base_app  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Vercel ASGI Path Normalizer Middleware
-# Vercel's Serverless router sometimes passes paths as /api/index.py, /index.py,
-# or strips /api into /health. This middleware normalizes all incoming requests
-# so FastAPI's routers always receive their expected /api/... paths.
 # ---------------------------------------------------------------------------
 class VercelPathNormalizer:
     def __init__(self, inner_app):
@@ -43,23 +41,32 @@ class VercelPathNormalizer:
 
     async def __call__(self, scope, receive, send):
         if scope.get("type") == "http":
-            path = scope.get("path", "")
-            headers = dict(scope.get("headers", []))
-            matched_path = headers.get(b"x-matched-path", b"").decode("utf-8")
+            query_str = scope.get("query_string", b"").decode("utf-8")
+            params = urllib.parse.parse_qs(query_str)
 
-            if matched_path and matched_path.startswith("/api"):
-                scope["path"] = matched_path
-            elif path.startswith("/api/index.py"):
-                sub = path[len("/api/index.py"):]
-                scope["path"] = "/api" + (sub if sub.startswith("/") else ("/" + sub if sub else ""))
-            elif path.startswith("/api/index"):
-                sub = path[len("/api/index"):]
-                scope["path"] = "/api" + (sub if sub.startswith("/") else ("/" + sub if sub else ""))
-            elif path.startswith("/index.py"):
-                sub = path[len("/index.py"):]
-                scope["path"] = "/api" + (sub if sub.startswith("/") else ("/" + sub if sub else ""))
-            elif not path.startswith("/api") and path not in ["", "/", "/index.html"]:
-                scope["path"] = "/api" + (path if path.startswith("/") else ("/" + path))
+            # 1. Path passed explicitly via rewrite query param ?__path=...
+            if "__path" in params and params["__path"]:
+                sub = params["__path"][0]
+                if not sub.startswith("/"):
+                    sub = "/" + sub
+                scope["path"] = "/api" + sub if not sub.startswith("/api") else sub
+            else:
+                path = scope.get("path", "")
+                headers = dict(scope.get("headers", []))
+                matched_path = headers.get(b"x-matched-path", b"").decode("utf-8")
+
+                if matched_path and matched_path.startswith("/api"):
+                    scope["path"] = matched_path
+                elif path.startswith("/api/index.py"):
+                    sub = path[len("/api/index.py"):]
+                    scope["path"] = "/api" + (sub if sub.startswith("/") else ("/" + sub if sub else ""))
+                elif path.startswith("/api/index"):
+                    sub = path[len("/api/index"):]
+                    scope["path"] = "/api" + (sub if sub.startswith("/") else ("/" + sub if sub else ""))
+                elif not path.startswith("/api") and path not in ["", "/", "/index.html"]:
+                    scope["path"] = "/api" + (path if path.startswith("/") else ("/" + path))
+                elif path in ["", "/"]:
+                    scope["path"] = "/api/health"
 
         await self.inner_app(scope, receive, send)
 
