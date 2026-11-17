@@ -84,9 +84,11 @@ def health_check():
 # ---------------------------------------------------------------------------
 FRONTEND_DIST = None
 _candidates = [
+    Path(__file__).resolve().parent.parent.parent / "public",
     Path(__file__).resolve().parent.parent.parent / "frontend" / "dist",
-    Path(__file__).resolve().parent.parent / "frontend" / "dist",
+    Path("public"),
     Path("frontend/dist"),
+    Path("/var/task/public"),
     Path("/var/task/frontend/dist"),
 ]
 for _c in _candidates:
@@ -99,21 +101,17 @@ if FRONTEND_DIST:
     if _assets_path.exists():
         app.mount("/assets", StaticFiles(directory=str(_assets_path)), name="frontend_assets")
 
+    @app.get("/")
+    @app.get("/index.html")
+    def serve_index():
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
+
     @app.get("/{full_path:path}")
     async def serve_spa_frontend(full_path: str):
         # Never intercept API requests
-        if full_path.startswith("api/") or full_path == "api":
+        if full_path.startswith("api/") or full_path == "api" or full_path.startswith("api?"):
             raise HTTPException(status_code=404, detail="API route not found")
         target_file = FRONTEND_DIST / full_path
         if target_file.is_file():
             return FileResponse(str(target_file))
         return FileResponse(str(FRONTEND_DIST / "index.html"))
-else:
-    @app.get("/")
-    def root_fallback():
-        return {
-            "message": "StudyMind AI Backend is running.",
-            "status": "online",
-            "docs": "/docs",
-            "api_health": "/api/health"
-        }
