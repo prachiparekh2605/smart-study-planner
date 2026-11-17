@@ -59,6 +59,7 @@ app.include_router(analytics_routes.router)
 app.include_router(revision_routes.router)
 app.include_router(focus_routes.router)
 
+@app.get("/health")
 @app.get("/api")
 @app.get("/api/")
 @app.get("/api/health")

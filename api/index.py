@@ -27,8 +27,40 @@ if os.getenv("VERCEL") or os.getenv("NOW_REGION"):
         Path(_d).mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
-# Import the FastAPI app — all routes, agents, and DB setup are inside main.py
+# Import the FastAPI app
 # ---------------------------------------------------------------------------
-from app.main import app  # noqa: E402  (import after sys.path mutation is intentional)
+from app.main import app as _base_app  # noqa: E402
 
-# Vercel Python runtime picks up the name `app` automatically.
+# ---------------------------------------------------------------------------
+# Vercel ASGI Path Normalizer Middleware
+# Vercel's Serverless router sometimes passes paths as /api/index.py, /index.py,
+# or strips /api into /health. This middleware normalizes all incoming requests
+# so FastAPI's routers always receive their expected /api/... paths.
+# ---------------------------------------------------------------------------
+class VercelPathNormalizer:
+    def __init__(self, inner_app):
+        self.inner_app = inner_app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            path = scope.get("path", "")
+            headers = dict(scope.get("headers", []))
+            matched_path = headers.get(b"x-matched-path", b"").decode("utf-8")
+
+            if matched_path and matched_path.startswith("/api"):
+                scope["path"] = matched_path
+            elif path.startswith("/api/index.py"):
+                sub = path[len("/api/index.py"):]
+                scope["path"] = "/api" + (sub if sub.startswith("/") else ("/" + sub if sub else ""))
+            elif path.startswith("/api/index"):
+                sub = path[len("/api/index"):]
+                scope["path"] = "/api" + (sub if sub.startswith("/") else ("/" + sub if sub else ""))
+            elif path.startswith("/index.py"):
+                sub = path[len("/index.py"):]
+                scope["path"] = "/api" + (sub if sub.startswith("/") else ("/" + sub if sub else ""))
+            elif not path.startswith("/api") and path not in ["", "/", "/index.html"]:
+                scope["path"] = "/api" + (path if path.startswith("/") else ("/" + path))
+
+        await self.inner_app(scope, receive, send)
+
+app = VercelPathNormalizer(_base_app)
